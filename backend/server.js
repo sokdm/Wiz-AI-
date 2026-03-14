@@ -20,12 +20,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdn.jsdelivr.net"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdn.jsdelivr.net"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
+      imgSrc: ["'self'", "data:", "https:"],
       fontSrc: ["'self'", "https:", "data:"],
-      connectSrc: ["'self'", "https://api.stripe.com", "https://*.stripe.com"],
-      frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
     },
   },
 }));
@@ -64,16 +62,16 @@ app.use('/api/admin', require('./routes/admin'));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
+  res.json({ 
+    status: 'ok', 
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
+  res.json({ 
+    status: 'ok', 
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
@@ -82,7 +80,7 @@ app.get('/api/health', (req, res) => {
 // Serve static files from frontend/out
 app.use(express.static(path.join(__dirname, '../frontend/out')));
 
-// Serve admin panel - FIXED: Correct path to admin folder
+// Serve admin panel
 app.use('/admin', express.static(path.join(__dirname, '../admin')));
 
 // API 404 handler
@@ -98,8 +96,8 @@ app.get('*', (req, res) => {
 // Error handling
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
-  res.status(500).json({
-    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  res.status(500).json({ 
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message 
   });
 });
 
