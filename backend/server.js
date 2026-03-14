@@ -9,8 +9,18 @@ require('dotenv').config();
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// Security middleware - ONLY THIS LINE CHANGED to allow Tailwind CDN
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "https:", "data:"],
+    },
+  },
+}));
 app.use(compression());
 app.use(morgan('dev'));
 
@@ -44,8 +54,8 @@ app.use('/api/admin', require('./routes/admin'));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
@@ -54,7 +64,7 @@ app.get('/health', (req, res) => {
 // Serve static files from frontend/out (Next.js export)
 app.use(express.static(path.join(__dirname, '../frontend/out')));
 
-// Serve admin panel
+// Serve admin panel - YOUR ORIGINAL PATH UNCHANGED
 app.use('/admin', express.static(path.join(__dirname, '../frontend/public/admin')));
 
 // API 404 handler
@@ -70,8 +80,8 @@ app.get('*', (req, res) => {
 // Error handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message 
+  res.status(500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
   });
 });
 
