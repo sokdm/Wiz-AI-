@@ -29,7 +29,6 @@ class PaymentService {
       customerEmail: email
     });
 
-    // Use direct API call instead of library
     const payload = {
       tx_ref: txRef,
       amount: amount,
@@ -134,10 +133,11 @@ class PaymentService {
       'subscription.startDate': startDate,
       'subscription.endDate': endDate
     });
+    
+    console.log(`Subscription activated: ${userId} -> ${plan}`);
   }
 
   async handleWebhook(payload) {
-    // Verify webhook signature if needed
     if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
       await this.verifyPayment(payload.data.id);
     }

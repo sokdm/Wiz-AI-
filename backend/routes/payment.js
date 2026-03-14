@@ -3,6 +3,7 @@ const router = express.Router();
 const { auth } = require('../middleware/auth');
 const paymentService = require('../services/paymentService');
 const Payment = require('../models/Payment');
+const crypto = require('crypto');
 
 // Initialize payment
 router.post('/initialize', auth, async (req, res) => {
@@ -48,16 +49,34 @@ router.get('/history', auth, async (req, res) => {
   }
 });
 
-// Webhook
+// Webhook - SECURED WITH SIGNATURE VERIFICATION
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
-    const payload = {
-      body: req.body,
-      headers: req.headers,
-      event: req.body.event
-    };
+    // Get signature from headers
+    const signature = req.headers['verif-hash'];
+    const secretHash = process.env.FLW_WEBHOOK_SECRET;
     
-    await paymentService.handleWebhook(payload);
+    // Verify signature
+    if (!signature) {
+      console.log('No signature provided');
+      return res.status(401).json({ error: 'No signature' });
+    }
+    
+    if (signature !== secretHash) {
+      console.log('Invalid signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    // Parse the raw body
+    const payload = JSON.parse(req.body);
+    console.log('Webhook received:', payload.event);
+    
+    // Handle successful payment
+    if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
+      await paymentService.verifyPayment(payload.data.id);
+      console.log('Payment verified and subscription activated');
+    }
+
     res.json({ received: true });
   } catch (error) {
     console.error('Webhook Error:', error);
