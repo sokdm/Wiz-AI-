@@ -1,15 +1,39 @@
 #!/bin/bash
-echo "Installing backend dependencies..."
-cd backend && npm install
+set -e
 
-echo "Installing frontend dependencies..."
-cd ../frontend && npm install
+echo "=== Wiz AI Build Process ==="
 
-echo "Building frontend for static export..."
-npm run build
+# Install backend dependencies
+echo "📦 Installing backend dependencies..."
+cd backend
+npm install
+cd ..
 
-echo "Build complete! Contents of out directory:"
-ls -la out/
+# Install frontend dependencies
+echo "📦 Installing frontend dependencies..."
+cd frontend
 
-echo "Admin directory:"
-ls -la public/admin/
+# Create .babelrc to force Babel instead of SWC (fixes Render build)
+if [ ! -f .babelrc ]; then
+  echo '{"presets": ["next/babel"]}' > .babelrc
+  echo "✅ Created .babelrc to disable SWC"
+fi
+
+# Install dependencies
+npm install
+
+# Build frontend with Babel instead of SWC
+echo "🔨 Building frontend..."
+NODE_OPTIONS="--max-old-space-size=4096" npm run build 2>&1 || {
+  echo "❌ Build failed, trying with more memory..."
+  NODE_OPTIONS="--max-old-space-size=8192" npm run build
+}
+
+cd ..
+
+echo "=== Build Complete ==="
+echo "📁 Frontend build contents:"
+ls -la frontend/out/ 2>/dev/null || echo "❌ frontend/out/ NOT FOUND"
+echo ""
+echo "📁 Admin directory:"
+ls -la frontend/public/admin/ 2>/dev/null || ls -la admin/ 2>/dev/null || echo "❌ Admin not found"
