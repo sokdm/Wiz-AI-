@@ -9,17 +9,10 @@ require('dotenv').config();
 
 const app = express();
 
-// Security middleware - ONLY THIS LINE CHANGED to allow Tailwind CDN
+// Security middleware - CSP DISABLED to test
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      fontSrc: ["'self'", "https:", "data:"],
-    },
-  },
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
 }));
 app.use(compression());
 app.use(morgan('dev'));
@@ -64,7 +57,7 @@ app.get('/health', (req, res) => {
 // Serve static files from frontend/out (Next.js export)
 app.use(express.static(path.join(__dirname, '../frontend/out')));
 
-// Serve admin panel - YOUR ORIGINAL PATH UNCHANGED
+// Serve admin panel - YOUR ORIGINAL PATH
 app.use('/admin', express.static(path.join(__dirname, '../frontend/public/admin')));
 
 // API 404 handler
