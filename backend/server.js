@@ -9,33 +9,15 @@ require('dotenv').config();
 
 const app = express();
 
-// Debug: log all requests
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  next();
-});
-
-// Security middleware - FIXED: Allow Tailwind CDN
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      fontSrc: ["'self'", "https:", "data:"],
-    },
-  },
-}));
+// Security middleware
+app.use(helmet());
 app.use(compression());
 app.use(morgan('dev'));
 
-// CORS - allow all origins
+// CORS
 app.use(cors({
   origin: '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  credentials: true
 }));
 
 // Body parsing
@@ -69,33 +51,25 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-// Serve static files from frontend/out
+// Serve static files from frontend/out (Next.js export)
 app.use(express.static(path.join(__dirname, '../frontend/out')));
 
 // Serve admin panel
-app.use('/admin', express.static(path.join(__dirname, '../admin')));
+app.use('/admin', express.static(path.join(__dirname, '../frontend/public/admin')));
 
 // API 404 handler
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API route not found' });
 });
 
-// All other routes -> serve frontend
+// All other routes -> serve frontend index.html (for client-side routing)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/out/index.html'));
 });
 
 // Error handling
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
+  console.error(err.stack);
   res.status(500).json({ 
     error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message 
   });
@@ -109,4 +83,12 @@ app.listen(PORT, '0.0.0.0', () => {
 🌍 Environment: ${process.env.NODE_ENV || 'development'}
 📅 ${new Date().toLocaleString()}
   `);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  mongoose.connection.close(false, () => {
+    process.exit(0);
+  });
 });
