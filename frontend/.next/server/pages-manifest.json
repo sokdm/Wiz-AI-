@@ -1,15 +1,15 @@
 {
-  "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
   "/dashboard": "pages/dashboard.js",
+  "/_document": "pages/_document.js",
+  "/_app": "pages/_app.js",
   "/homework": "pages/homework.js",
   "/": "pages/index.js",
-  "/payment/subscribe": "pages/payment/subscribe.js",
-  "/image-solver": "pages/image-solver.js",
   "/login": "pages/login.js",
-  "/tutor": "pages/tutor.js",
+  "/image-solver": "pages/image-solver.js",
+  "/payment/subscribe": "pages/payment/subscribe.js",
   "/payment/verify": "pages/payment/verify.js",
-  "/quiz": "pages/quiz.js",
-  "/register": "pages/register.js"
+  "/register": "pages/register.js",
+  "/tutor": "pages/tutor.js",
+  "/quiz": "pages/quiz.js"
 }
