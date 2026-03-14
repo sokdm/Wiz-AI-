@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -31,7 +32,7 @@ mongoose.connect(process.env.MONGODB_URI)
     process.exit(1);
   });
 
-// Routes
+// API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/conversations', require('./routes/conversations'));
@@ -50,6 +51,20 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Serve frontend static files (in production)
+if (process.env.NODE_ENV === 'production') {
+  // Serve Next.js static files
+  app.use(express.static(path.join(__dirname, '../frontend/out')));
+  
+  // Serve admin panel
+  app.use('/admin', express.static(path.join(__dirname, '../frontend/public/admin')));
+  
+  // All other routes -> frontend
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/out/index.html'));
+  });
+}
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -63,7 +78,7 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
 🚀 Wiz AI Server Running

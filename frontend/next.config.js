@@ -1,18 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: false,  // Disable SWC
+  swcMinify: false,
+  output: 'export',
+  distDir: 'out',
   env: {
-    API_URL: process.env.API_URL || 'http://localhost:5000',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:5000/api/:path*',
-      },
-    ];
-  },
+  images: {
+    unoptimized: true
+  }
 };
 
 module.exports = nextConfig;
