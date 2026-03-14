@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
@@ -8,10 +8,13 @@ import {
   TrophyIcon,
   ClockIcon,
   UsersIcon,
-  ArrowRightIcon,
   StarIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  LightBulbIcon,
+  CheckCircleIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
+import ReactMarkdown from 'react-markdown';
 import api from '../services/api';
 import { useStore } from '../store/useStore';
 
@@ -37,8 +40,25 @@ export default function QuizGame() {
   const [showingResult, setShowingResult] = useState(false);
   const [removedOptions, setRemovedOptions] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [explanation, setExplanation] = useState(null);
+  const [answerResult, setAnswerResult] = useState(null);
+  
+  // Refs for cleanup
+  const timerRef = useRef(null);
+  const timeoutRef = useRef(null);
+  const isMountedRef = useRef(true);
+  
   const router = useRouter();
   const { isAuthenticated, user } = useStore();
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -46,14 +66,15 @@ export default function QuizGame() {
       return;
     }
     fetchLeaderboard();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
+  // Timer effect with proper cleanup
   useEffect(() => {
-    let timer;
     if (gameState === 'playing' && timeLeft > 0 && !showingResult) {
-      timer = setInterval(() => {
+      timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
             handleTimeUp();
             return 0;
           }
@@ -61,21 +82,33 @@ export default function QuizGame() {
         });
       }, 1000);
     }
-    return () => clearInterval(timer);
-  }, [gameState, timeLeft, showingResult]);
 
-  const fetchLeaderboard = async () => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [gameState, showingResult]);
+
+  const fetchLeaderboard = useCallback(async () => {
     try {
       const response = await api.get('/quiz/leaderboard?limit=5');
-      setLeaderboard(response.data);
+      if (isMountedRef.current) {
+        setLeaderboard(response.data);
+      }
     } catch (error) {
       console.error('Failed to fetch leaderboard');
     }
-  };
+  }, []);
 
-  const startGame = async () => {
+  const startGame = useCallback(async () => {
     try {
+      // Clear any existing timeouts
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      
       const response = await api.get('/quiz/start');
+      
+      if (!isMountedRef.current) return;
+      
       setGameState('playing');
       setCurrentLevel(response.data.currentLevel);
       setScore(response.data.currentScore);
@@ -85,6 +118,8 @@ export default function QuizGame() {
       setRemovedOptions([]);
       setSelectedOption(null);
       setShowingResult(false);
+      setExplanation(null);
+      setAnswerResult(null);
     } catch (error) {
       if (error.response?.data?.upgrade) {
         toast.error('Daily quiz limit reached. Upgrade to Premium!');
@@ -92,23 +127,31 @@ export default function QuizGame() {
         toast.error('Failed to start game');
       }
     }
-  };
+  }, []);
 
-  const fetchQuestion = async (level) => {
+  const fetchQuestion = useCallback(async (level) => {
     try {
       const response = await api.get(`/quiz/question/${level}`);
+      
+      if (!isMountedRef.current) return;
+      
       setCurrentQuestion(response.data);
       setTimeLeft(30);
       setRemovedOptions([]);
       setSelectedOption(null);
       setShowingResult(false);
+      setExplanation(null);
+      setAnswerResult(null);
     } catch (error) {
       toast.error('Failed to load question');
     }
-  };
+  }, []);
 
-  const handleAnswer = async (option) => {
+  const handleAnswer = useCallback(async (option) => {
     if (showingResult) return;
+    
+    // Stop timer immediately
+    if (timerRef.current) clearInterval(timerRef.current);
     
     setSelectedOption(option);
     setShowingResult(true);
@@ -120,34 +163,54 @@ export default function QuizGame() {
         timeTaken: 30 - timeLeft
       });
 
-      if (response.data.correct) {
-        if (response.data.gameComplete) {
-          toast.success('Congratulations! You won 1,000,000 points!');
-          setGameState('finished');
-          setScore(1000000);
+      const data = response.data;
+      
+      if (!isMountedRef.current) return;
+      
+      setAnswerResult(data);
+      
+      if (data.explanation) {
+        setExplanation(data.explanation);
+      }
+
+      if (data.correct) {
+        if (data.gameComplete) {
+          toast.success('🎉 Congratulations! You won 1,000,000 points!');
+          timeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setGameState('finished');
+              setScore(1000000);
+            }
+          }, 5000);
         } else {
-          setTimeout(() => {
-            setCurrentLevel(response.data.currentLevel);
-            setScore(response.data.currentScore);
-            fetchQuestion(response.data.currentLevel);
-          }, 1500);
+          timeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setCurrentLevel(data.currentLevel);
+              setScore(data.currentScore);
+              fetchQuestion(data.currentLevel);
+            }
+          }, 8000);
         }
       } else {
-        toast.error(`Game Over! Correct answer was ${response.data.correctAnswer}`);
-        setGameState('finished');
-        setScore(response.data.finalScore);
+        timeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            setGameState('finished');
+            setScore(data.finalScore);
+          }
+        }, 8000);
       }
     } catch (error) {
       toast.error('Failed to submit answer');
+      setShowingResult(false);
     }
-  };
+  }, [showingResult, currentQuestion, timeLeft, fetchQuestion]);
 
-  const handleTimeUp = () => {
-    toast.error("Time is up!");
+  const handleTimeUp = useCallback(() => {
+    toast.error("Time's up!");
     setGameState('finished');
-  };
+  }, []);
 
-  const useLifeline = async (type) => {
+  const useLifeline = useCallback(async (type) => {
     if (lifelines[type] <= 0) return;
 
     try {
@@ -156,6 +219,8 @@ export default function QuizGame() {
       if (type === 'fiftyFifty') {
         setRemovedOptions(response.data.removedOptions);
       } else if (type === 'skip') {
+        // Clear timeouts before fetching new question
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         fetchQuestion(currentLevel + 1);
         setCurrentLevel(prev => prev + 1);
       } else if (type === 'askAudience') {
@@ -166,9 +231,9 @@ export default function QuizGame() {
     } catch (error) {
       toast.error('Failed to use lifeline');
     }
-  };
+  }, [lifelines, currentLevel, fetchQuestion]);
 
-  const getOptionStyle = (option) => {
+  const getOptionStyle = useCallback((option) => {
     if (!showingResult) {
       if (removedOptions.includes(option)) {
         return 'opacity-25 cursor-not-allowed';
@@ -176,11 +241,16 @@ export default function QuizGame() {
       return 'hover:bg-blue-50 hover:border-blue-300 cursor-pointer';
     }
     
-    if (option === selectedOption) {
-      return 'bg-yellow-100 border-yellow-500';
+    if (answerResult) {
+      if (option === answerResult.correctAnswer) {
+        return 'bg-green-500 text-white border-green-500';
+      }
+      if (option === selectedOption && option !== answerResult.correctAnswer) {
+        return 'bg-red-500 text-white border-red-500';
+      }
     }
     return 'opacity-50';
-  };
+  }, [showingResult, removedOptions, answerResult, selectedOption]);
 
   if (!isAuthenticated) return null;
 
@@ -207,7 +277,7 @@ export default function QuizGame() {
               </h1>
               <p className="text-xl text-gray-300 mb-8">
                 Test your knowledge and win up to 1,000,000 points! 
-                15 questions, 3 lifelines, endless fun.
+                15 questions, 3 lifelines, AI-powered explanations.
               </p>
               
               <div className="space-y-4 mb-8">
@@ -220,8 +290,8 @@ export default function QuizGame() {
                   <span>30 seconds per question</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <TrophyIcon className="w-6 h-6 text-green-400" />
-                  <span>Compete on the leaderboard</span>
+                  <LightBulbIcon className="w-6 h-6 text-green-400" />
+                  <span>AI explanations after every answer</span>
                 </div>
               </div>
 
@@ -266,6 +336,38 @@ export default function QuizGame() {
     );
   }
 
+  if (gameState === 'finished') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white flex items-center justify-center">
+        <Head>
+          <title>Game Over - Millionaire Quiz</title>
+        </Head>
+
+        <div className="text-center p-8 bg-white/10 backdrop-blur-lg rounded-3xl max-w-lg mx-4">
+          <TrophyIcon className="w-20 h-20 mx-auto text-yellow-400 mb-6" />
+          <h2 className="text-4xl font-bold mb-4">Game Over!</h2>
+          <p className="text-2xl mb-2">Final Score</p>
+          <p className="text-5xl font-bold text-yellow-400 mb-8">{score.toLocaleString()} pts</p>
+          
+          <div className="space-y-3">
+            <button
+              onClick={startGame}
+              className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:from-yellow-600 hover:to-orange-600 transition-all"
+            >
+              Play Again
+            </button>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="w-full bg-white/20 text-white py-3 rounded-xl font-semibold hover:bg-white/30 transition-all"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
       <Head>
@@ -273,6 +375,7 @@ export default function QuizGame() {
       </Head>
 
       <div className="container mx-auto px-6 py-8 max-w-4xl">
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <span className="text-2xl font-bold">Question {currentLevel}/15</span>
@@ -286,6 +389,36 @@ export default function QuizGame() {
           </div>
         </div>
 
+        {/* Prize Ladder */}
+        <div className="flex justify-center mb-8">
+          <div className="flex gap-2 flex-wrap justify-center">
+            {PRIZE_LADDER.map((amount, idx) => {
+              if (idx === 0) return null;
+              const isSafe = SAFE_HAVENS.includes(idx);
+              const isCurrent = idx === currentLevel;
+              const isPast = idx < currentLevel;
+              
+              return (
+                <div
+                  key={idx}
+                  className={`px-3 py-1 rounded-lg text-sm font-bold ${
+                    isCurrent
+                      ? 'bg-yellow-500 text-black'
+                      : isPast
+                      ? 'bg-green-500/50 text-white'
+                      : isSafe
+                      ? 'bg-white/20 text-yellow-300 border border-yellow-400/50'
+                      : 'bg-white/5 text-gray-400'
+                  }`}
+                >
+                  {idx}: {amount >= 1000 ? `${amount / 1000}K` : amount}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Lifelines */}
         <div className="flex gap-4 mb-8 justify-center">
           <button
             onClick={() => useLifeline('fiftyFifty')}
@@ -323,6 +456,7 @@ export default function QuizGame() {
           </button>
         </div>
 
+        {/* Question */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
           <div className="text-sm text-gray-400 mb-2 uppercase tracking-wide">
             {currentQuestion?.category}
@@ -332,7 +466,8 @@ export default function QuizGame() {
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
+        {/* Options */}
+        <div className="grid md:grid-cols-2 gap-4 mb-8">
           {['A', 'B', 'C', 'D'].map((option) => (
             <button
               key={option}
@@ -346,26 +481,44 @@ export default function QuizGame() {
           ))}
         </div>
 
-        <div className="mt-12 bg-black/30 rounded-xl p-4 overflow-x-auto">
-          <div className="flex gap-2 min-w-max">
-            {PRIZE_LADDER.map((amount, idx) => (
-              <div
-                key={idx}
-                className={`px-4 py-2 rounded-lg text-sm font-bold ${
-                  idx === currentLevel
-                    ? 'bg-yellow-500 text-black'
-                    : idx < currentLevel
-                    ? 'bg-green-500/50'
-                    : SAFE_HAVENS.includes(idx)
-                    ? 'bg-white/20'
-                    : 'bg-white/5'
-                }`}
-              >
-                {idx}: {amount.toLocaleString()}
+        {/* AI Explanation - Shows after answer */}
+        {showingResult && explanation && (
+          <div className="bg-white rounded-2xl p-8 mb-8 text-gray-900 animate-fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              {answerResult?.correct ? (
+                <CheckCircleIcon className="w-8 h-8 text-green-500" />
+              ) : (
+                <XCircleIcon className="w-8 h-8 text-red-500" />
+              )}
+              <div>
+                <h3 className="text-xl font-bold">
+                  {answerResult?.correct ? 'Correct!' : 'Incorrect!'}
+                </h3>
+                <p className="text-gray-600">
+                  Correct answer: <span className="font-bold text-green-600">{answerResult?.correctAnswer}) {answerResult?.correctOption}</span>
+                </p>
               </div>
-            ))}
+            </div>
+            
+            <div className="bg-blue-50 rounded-xl p-6 border-l-4 border-blue-500">
+              <div className="flex items-center gap-2 mb-3">
+                <LightBulbIcon className="w-5 h-5 text-blue-600" />
+                <span className="font-semibold text-blue-900">AI Explanation</span>
+              </div>
+              <div className="prose prose-blue max-w-none text-gray-700">
+                <ReactMarkdown>{explanation}</ReactMarkdown>
+              </div>
+            </div>
+
+            <p className="text-center text-gray-500 mt-4 text-sm">
+              {answerResult?.gameComplete 
+                ? 'Game Over! Redirecting...' 
+                : answerResult?.correct 
+                  ? 'Next question loading...' 
+                  : 'Game Over! Redirecting...'}
+            </p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

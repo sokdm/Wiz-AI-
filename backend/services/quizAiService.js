@@ -35,7 +35,7 @@ Requirements:
 - Four options labeled A, B, C, D
 - Only ONE correct answer
 - Wrong answers should be plausible but clearly incorrect
-- Include a brief explanation of why the correct answer is right
+- Include a detailed explanation of why the correct answer is right (2-3 sentences)
 
 Format your response EXACTLY like this:
 QUESTION: [your question here]
@@ -44,7 +44,7 @@ B: [option B]
 C: [option C]
 D: [option D]
 CORRECT: [A/B/C/D]
-EXPLANATION: [brief explanation]`;
+EXPLANATION: [detailed 2-3 sentence explanation]`;
 
     try {
       const result = await aiService.generateResponse(prompt, 'quiz_hint');
@@ -52,8 +52,35 @@ EXPLANATION: [brief explanation]`;
       return parsed;
     } catch (error) {
       console.error('AI Question Generation Error:', error);
-      // Return fallback question if AI fails
       return this.getFallbackQuestion(level, selectedCategory);
+    }
+  }
+
+  // MISSING METHOD ADDED HERE
+  async generateExplanation(question, options, correctAnswer, userAnswer, isCorrect) {
+    const prompt = `For this quiz question: "${question}"
+Options:
+A: ${options.A}
+B: ${options.B}
+C: ${options.C}
+D: ${options.D}
+Correct answer: ${correctAnswer}) ${options[correctAnswer]}
+User answered: ${userAnswer}) ${options[userAnswer]}
+Result: ${isCorrect ? 'CORRECT' : 'WRONG'}
+
+Provide a detailed, educational explanation (2-3 sentences) about:
+1. Why the correct answer is right
+2. ${!isCorrect ? `Why the user's answer (${userAnswer}) was wrong` : 'Brief confirmation of why this is the right choice'}
+3. Any interesting facts related to the topic
+
+Make it engaging and educational like a tutor would explain.`;
+
+    try {
+      const result = await aiService.generateResponse(prompt, 'tutor');
+      return result.response;
+    } catch (error) {
+      console.error('Explanation Generation Error:', error);
+      return `The correct answer is ${correctAnswer}: ${options[correctAnswer]}. ${isCorrect ? 'Well done!' : 'Better luck next time!'}`;
     }
   }
 
@@ -77,7 +104,6 @@ EXPLANATION: [brief explanation]`;
         }
       }
 
-      // Validate
       if (!question || Object.keys(options).length !== 4 || !correctAnswer) {
         throw new Error('Failed to parse AI response');
       }
@@ -98,19 +124,18 @@ EXPLANATION: [brief explanation]`;
   }
 
   getFallbackQuestion(level, category) {
-    // Fallback questions if AI fails
     const fallbacks = [
       {
         question: "What is the capital of France?",
         options: { A: "London", B: "Berlin", C: "Paris", D: "Madrid" },
         correctAnswer: "C",
-        explanation: "Paris is the capital of France."
+        explanation: "Paris is the capital city of France and the center of French government, culture, and history. It has been the capital since 987 CE."
       },
       {
         question: "What is 2 + 2?",
         options: { A: "3", B: "4", C: "5", D: "6" },
         correctAnswer: "B",
-        explanation: "2 + 2 = 4"
+        explanation: "2 + 2 = 4. This is basic arithmetic where two units added to two units equals four units total."
       }
     ];
     
@@ -140,7 +165,6 @@ D: XX%`;
       const result = await aiService.generateResponse(prompt, 'quiz_hint');
       return result.response;
     } catch (error) {
-      // Fallback distribution favoring correct answer
       return `A: ${correctAnswer === 'A' ? '45%' : '20%'}
 B: ${correctAnswer === 'B' ? '45%' : '20%'}
 C: ${correctAnswer === 'C' ? '45%' : '20%'}
