@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiz AI Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .sidebar { transition: transform 0.3s; }
+        .hidden-sidebar { transform: translateX(-100%); }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="login-screen" class="min-h-screen flex items-center justify-center">
+            <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-xl w-full max-w-md mx-4">
+                <h1 class="text-3xl font-bold mb-2 text-center">Wiz AI Admin</h1>
+                <p class="text-gray-600 text-center mb-8">Sign in to manage your platform</p>
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="admin-email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="admin-password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                        Sign In
+                    </button>
+                </form>
+                <p id="login-error" class="text-red-500 text-center mt-4 hidden"></p>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" class="hidden min-h-screen flex">
+            <!-- Sidebar -->
+            <aside class="sidebar w-64 bg-gray-900 text-white fixed inset-y-0 left-0 z-50 overflow-y-auto">
+                <div class="p-6 border-b border-gray-800">
+                    <h2 class="text-2xl font-bold">Wiz AI Admin</h2>
+                </div>
+                <nav class="p-4 space-y-2">
+                    <button onclick="showSection('overview')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
+                        <span>📊</span> Overview
+                    </button>
+                    <button onclick="showSection('users')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
+                        <span>👥</span> Users
+                    </button>
+                    <button onclick="showSection('payments')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
+                        <span>💳</span> Payments
+                    </button>
+                    <button onclick="showSection('ai-logs')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
+                        <span>🤖</span> AI Usage
+                    </button>
+                    <button onclick="showSection('quiz')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
+                        <span>🎯</span> Quiz Manager
+                    </button>
+                    <button onclick="showSection('settings')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
+                        <span>⚙️</span> Settings
+                    </button>
+                    <button onclick="logout()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-3 text-red-400 hover:text-white">
+                        <span>🚪</span> Logout
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 ml-64 p-8 overflow-y-auto">
+                <!-- Overview Section -->
+                <div id="section-overview" class="section-content space-y-6 fade-in">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-3xl font-bold">Dashboard Overview</h2>
+                        <button onclick="loadDashboardData()" class="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+                            <p class="text-gray-600 text-sm font-medium">Total Users</p>
+                            <p class="text-3xl font-bold text-gray-900 mt-2" id="stat-total-users">-</p>
+                            <p class="text-sm text-green-600 mt-1">↗ +12% this week</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
+                            <p class="text-gray-600 text-sm font-medium">Premium Users</p>
+                            <p class="text-3xl font-bold text-gray-900 mt-2" id="stat-premium-users">-</p>
+                            <p class="text-sm text-gray-500 mt-1">Active subscribers</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500">
+                            <p class="text-gray-600 text-sm font-medium">Today's Revenue</p>
+                            <p class="text-3xl font-bold text-gray-900 mt-2" id="stat-revenue">-</p>
+                            <p class="text-sm text-gray-500 mt-1">USD</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-500">
+                            <p class="text-gray-600 text-sm font-medium">AI Requests Today</p>
+                            <p class="text-3xl font-bold text-gray-900 mt-2" id="stat-ai-usage">-</p>
+                            <p class="text-sm text-gray-500 mt-1">Across all users</p>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6 mt-8">
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h3 class="text-lg font-semibold mb-4">Quick Actions</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <button onclick="showSection('users')" class="p-4 bg-blue-50 rounded-lg text-left hover:bg-blue-100 transition-colors">
+                                    <span class="text-2xl">👥</span>
+                                    <p class="font-semibold mt-2">Manage Users</p>
+                                </button>
+                                <button onclick="showSection('quiz')" class="p-4 bg-green-50 rounded-lg text-left hover:bg-green-100 transition-colors">
+                                    <span class="text-2xl">🎯</span>
+                                    <p class="font-semibold mt-2">Add Questions</p>
+                                </button>
+                                <button onclick="showSection('ai-logs')" class="p-4 bg-purple-50 rounded-lg text-left hover:bg-purple-100 transition-colors">
+                                    <span class="text-2xl">📊</span>
+                                    <p class="font-semibold mt-2">View Logs</p>
+                                </button>
+                                <button onclick="showSection('settings')" class="p-4 bg-orange-50 rounded-lg text-left hover:bg-orange-100 transition-colors">
+                                    <span class="text-2xl">⚙️</span>
+                                    <p class="font-semibold mt-2">Settings</p>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h3 class="text-lg font-semibold mb-4">System Status</h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                        API Server
+                                    </span>
+                                    <span class="text-green-600 font-medium">Online</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                        Database
+                                    </span>
+                                    <span class="text-green-600 font-medium">Connected</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                        AI Service
+                                    </span>
+                                    <span class="text-green-600 font-medium">Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Users Section -->
+                <div id="section-users" class="section-content hidden space-y-6 fade-in">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-3xl font-bold">User Management</h2>
+                        <div class="flex gap-2">
+                            <input type="text" id="user-search" placeholder="Search users..." 
+                                class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                onkeyup="filterUsers()">
+                            <button onclick="loadUsers()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">User</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Plan</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Status</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Usage Today</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Joined</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table" class="divide-y divide-gray-100">
+                                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Loading users...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Payments Section -->
+                <div id="section-payments" class="section-content hidden space-y-6 fade-in">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-3xl font-bold">Payment History</h2>
+                        <button onclick="loadPayments()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Refresh
+                        </button>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Date</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">User</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Plan</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Amount</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Status</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Transaction ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payments-table" class="divide-y divide-gray-100">
+                                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Loading payments...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- AI Logs Section -->
+                <div id="section-ai-logs" class="section-content hidden space-y-6 fade-in">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-3xl font-bold">AI Usage Logs</h2>
+                        <div class="flex gap-2">
+                            <select id="log-filter" onchange="loadLogs()" class="px-4 py-2 border rounded-lg">
+                                <option value="all">All Types</option>
+                                <option value="homework">Homework</option>
+                                <option value="tutor">Tutor</option>
+                                <option value="image">Image</option>
+                                <option value="quiz_hint">Quiz Hint</option>
+                            </select>
+                            <button onclick="loadLogs()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Time</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">User</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Type</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Prompt</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Tokens</th>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600">Cached</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table" class="divide-y divide-gray-100">
+                                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Loading logs...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Quiz Manager Section -->
+                <div id="section-quiz" class="section-content hidden space-y-6 fade-in">
+                    <h2 class="text-3xl font-bold">Quiz Manager</h2>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-sm">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span>➕</span> Add New Question
+                        </h3>
+                        <form id="add-question-form" class="space-y-4">
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Question *</label>
+                                    <input type="text" id="q-question" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Option A *</label>
+                                    <input type="text" id="q-opt-a" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Option B *</label>
+                                    <input type="text" id="q-opt-b" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Option C *</label>
+                                    <input type="text" id="q-opt-c" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Option D *</label>
+                                    <input type="text" id="q-opt-d" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Correct Answer *</label>
+                                    <select id="q-correct" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="A">A</option>
+                                        <option value="B">B</option>
+                                        <option value="C">C</option>
+                                        <option value="D">D</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Difficulty (1-15) *</label>
+                                    <input type="number" id="q-level" min="1" max="15" value="1" 
+                                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                                    <select id="q-category" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option>Mathematics</option>
+                                        <option>Science</option>
+                                        <option>English</option>
+                                        <option>History</option>
+                                        <option>Geography</option>
+                                        <option>General Knowledge</option>
+                                    </select>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Explanation</label>
+                                    <textarea id="q-explanation" rows="3" 
+                                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Explain why the answer is correct..."></textarea>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+                                    Add Question
+                                </button>
+                                <button type="reset" class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors">
+                                    Clear Form
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm">
+                        <h3 class="text-lg font-semibold mb-4">Bulk Import</h3>
+                        <p class="text-gray-600 mb-4">Upload JSON file with multiple questions</p>
+                        <input type="file" accept=".json" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+                </div>
+                <!-- Settings Section -->
+                <div id="section-settings" class="section-content hidden space-y-6 fade-in">
+                    <h2 class="text-3xl font-bold">Platform Settings</h2>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-sm space-y-4">
+                        <h3 class="text-lg font-semibold mb-4">Feature Toggles</h3>
+                        
+                        <div class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                            <div>
+                                <h4 class="font-semibold">AI Tutor</h4>
+                                <p class="text-sm text-gray-600">Enable/disable AI tutor chat feature</p>
+                            </div>
+                            <button onclick="toggleFeature('ai-tutor')" id="toggle-ai-tutor" 
+                                class="px-4 py-2 bg-green-500 text-white rounded-lg font-medium transition-colors">
+                                Enabled
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                            <div>
+                                <h4 class="font-semibold">Quiz System</h4>
+                                <p class="text-sm text-gray-600">Enable/disable quiz games</p>
+                            </div>
+                            <button onclick="toggleFeature('quiz')" id="toggle-quiz" 
+                                class="px-4 py-2 bg-green-500 text-white rounded-lg font-medium transition-colors">
+                                Enabled
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                            <div>
+                                <h4 class="font-semibold">Image Solver</h4>
+                                <p class="text-sm text-gray-600">Enable/disable OCR image solving</p>
+                            </div>
+                            <button onclick="toggleFeature('image-solver')" id="toggle-image-solver" 
+                                class="px-4 py-2 bg-green-500 text-white rounded-lg font-medium transition-colors">
+                                Enabled
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 border border-red-200 bg-red-50 rounded-lg">
+                            <div>
+                                <h4 class="font-semibold text-red-700">🚨 Emergency Kill Switch</h4>
+                                <p class="text-sm text-red-600">Immediately disable ALL AI features system-wide</p>
+                            </div>
+                            <button onclick="emergencyStop()" 
+                                class="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors animate-pulse">
+                                ACTIVATE
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm">
+                        <h3 class="text-lg font-semibold mb-4">Pricing Configuration</h3>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Weekly Plan ($)</label>
+                                <input type="number" id="price-weekly" value="2.99" step="0.01" 
+                                    class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Plan ($)</label>
+                                <input type="number" id="price-monthly" value="9.99" step="0.01" 
+                                    class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Quarterly Plan ($)</label>
+                                <input type="number" id="price-quarterly" value="24.99" step="0.01" 
+                                    class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Yearly Plan ($)</label>
+                                <input type="number" id="price-yearly" value="79.99" step="0.01" 
+                                    class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        <button onclick="savePricing()" class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                            Save Pricing
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        let token = localStorage.getItem('adminToken');
+        let allUsers = [];
+
+        // Initialize
+        if (token) {
+            showDashboard();
+        }
+
+        // Login handler
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('admin-email').value;
+            const password = document.getElementById('admin-password').value;
+
+            try {
+                const response = await fetch(`${API_URL}/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (data.token) {
+                    token = data.token;
+                    localStorage.setItem('adminToken', token);
+                    showDashboard();
+                } else {
+                    showError(data.error || 'Login failed');
+                }
+            } catch (error) {
+                showError('Connection failed. Is the server running?');
+            }
+        });
+
+        function showError(msg) {
+            const err = document.getElementById('login-error');
+            err.textContent = msg;
+            err.classList.remove('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            loadDashboardData();
+        }
+
+        function logout() {
+            localStorage.removeItem('adminToken');
+            location.reload();
+        }
+
+        function showSection(section) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('bg-gray-800'));
+            
+            document.getElementById(`section-${section}`).classList.remove('hidden');
+            event.target.closest('button').classList.add('bg-gray-800');
+            
+            if (section === 'users') loadUsers();
+            if (section === 'payments') loadPayments();
+            if (section === 'ai-logs') loadLogs();
+        }
+
+        async function loadDashboardData() {
+            try {
+                const response = await fetch(`${API_URL}/admin/dashboard`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                
+                document.getElementById('stat-total-users').textContent = data.users?.total || 0;
+                document.getElementById('stat-premium-users').textContent = data.users?.premium || 0;
+                document.getElementById('stat-revenue').textContent = '$' + (data.revenue?.today || 0).toFixed(2);
+                document.getElementById('stat-ai-usage').textContent = data.aiUsage?.today || 0;
+            } catch (error) {
+                console.error('Dashboard load failed:', error);
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_URL}/admin/users`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                allUsers = await response.json();
+                renderUsers(allUsers);
+            } catch (error) {
+                document.getElementById('users-table').innerHTML = 
+                    '<tr><td colspan="6" class="px-6 py-8 text-center text-red-500">Failed to load users</td></tr>';
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('users-table');
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No users found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(u => `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-gray-900">${u.username}</div>
+                        <div class="text-sm text-gray-500">${u.email}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+                            u.subscription?.plan !== 'free' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                        }">
+                            ${u.subscription?.plan || 'free'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+                            u.subscription?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        }">
+                            ${u.subscription?.status || 'active'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        <div>AI: ${u.dailyUsage?.aiQuestions || 0}</div>
+                        <div>Images: ${u.dailyUsage?.imageSolves || 0}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        ${new Date(u.createdAt).toLocaleDateString()}
+                    </td>
+                    <td class="px-6 py-4">
+                        <button onclick="editUser('${u._id}')" class="text-blue-600 hover:text-blue-800 font-medium">
+                            Edit
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterUsers() {
+            const search = document.getElementById('user-search').value.toLowerCase();
+            const filtered = allUsers.filter(u => 
+                u.username.toLowerCase().includes(search) || 
+                u.email.toLowerCase().includes(search)
+            );
+            renderUsers(filtered);
+        }
+
+        async function loadPayments() {
+            try {
+                const response = await fetch(`${API_URL}/admin/payments`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const payments = await response.json();
+                
+                const tbody = document.getElementById('payments-table');
+                tbody.innerHTML = payments.map(p => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm">${new Date(p.createdAt).toLocaleString()}</td>
+                        <td class="px-6 py-4 text-sm">${p.customerEmail}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                                ${p.plan}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 font-medium">$${p.amount}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold ${
+                                p.status === 'successful' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }">
+                                ${p.status}
+                            </span>
+                        </td>
+                        <td class="px-6<td class="px-6 py-4 text-sm text-gray-500 font-mono">${p.transactionId?.slice(0, 20)}...</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                document.getElementById('payments-table').innerHTML = 
+                    '<tr><td colspan="6" class="px-6 py-8 text-center text-red-500">Failed to load payments</td></tr>';
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const filter = document.getElementById('log-filter').value;
+                const response = await fetch(`${API_URL}/admin/ai-logs`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const logs = await response.json();
+                
+                const filtered = filter === 'all' ? logs : logs.filter(l => l.type === filter);
+                
+                const tbody = document.getElementById('logs-table');
+                tbody.innerHTML = filtered.map(l => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm text-gray-600">${new Date(l.createdAt).toLocaleString()}</td>
+                        <td class="px-6 py-4 text-sm font-medium">${l.userId?.username || 'Unknown'}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                                ${l.type}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm max-w-xs truncate" title="${l.prompt}">${l.prompt}</td>
+                        <td class="px-6 py-4 text-sm">${l.tokensUsed}</td>
+                        <td class="px-6 py-4">
+                            ${l.cached ? '<span class="text-green-600">✓</span>' : '<span class="text-gray-400">-</span>'}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                document.getElementById('logs-table').innerHTML = 
+                    '<tr><td colspan="6" class="px-6 py-8 text-center text-red-500">Failed to load logs</td></tr>';
+            }
+        }
+
+        // Add question form
+        document.getElementById('add-question-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const question = {
+                question: document.getElementById('q-question').value,
+                options: {
+                    A: document.getElementById('q-opt-a').value,
+                    B: document.getElementById('q-opt-b').value,
+                    C: document.getElementById('q-opt-c').value,
+                    D: document.getElementById('q-opt-d').value
+                },
+                correctAnswer: document.getElementById('q-correct').value,
+                difficultyLevel: parseInt(document.getElementById('q-level').value),
+                category: document.getElementById('q-category').value,
+                explanation: document.getElementById('q-explanation').value
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/admin/quiz-questions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(question)
+                });
+
+                if (response.ok) {
+                    alert('✅ Question added successfully!');
+                    e.target.reset();
+                } else {
+                    alert('❌ Failed to add question');
+                }
+            } catch (error) {
+                alert('❌ Connection failed');
+            }
+        });
+
+        function toggleFeature(feature) {
+            const btn = document.getElementById(`toggle-${feature}`);
+            const isEnabled = btn.textContent.trim() === 'Enabled';
+            
+            btn.textContent = isEnabled ? 'Disabled' : 'Enabled';
+            btn.className = isEnabled ? 
+                'px-4 py-2 bg-red-500 text-white rounded-lg font-medium transition-colors' : 
+                'px-4 py-2 bg-green-500 text-white rounded-lg font-medium transition-colors';
+
+            fetch(`${API_URL}/admin/toggle-feature`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ feature, enabled: !isEnabled })
+            });
+        }
+
+        function emergencyStop() {
+            if (confirm('🚨 Are you sure? This will disable ALL AI features immediately for all users!')) {
+                fetch(`${API_URL}/admin/toggle-feature`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ feature: 'ai-global', enabled: false })
+                }).then(() => {
+                    alert('🛑 Emergency stop activated. All AI features disabled.');
+                    // Update all toggles to disabled
+                    ['ai-tutor', 'quiz', 'image-solver'].forEach(f => {
+                        const btn = document.getElementById(`toggle-${f}`);
+                        if (btn) {
+                            btn.textContent = 'Disabled';
+                            btn.className = 'px-4 py-2 bg-red-500 text-white rounded-lg font-medium transition-colors';
+                        }
+                    });
+                });
+            }
+        }
+
+        function editUser(userId) {
+            const user = allUsers.find(u => u._id === userId);
+            if (!user) return;
+            
+            const newPlan = prompt(`Edit user: ${user.username}\nCurrent plan: ${user.subscription?.plan || 'free'}\nEnter new plan (free/weekly/monthly/quarterly/yearly):`);
+            if (newPlan && ['free', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(newPlan)) {
+                fetch(`${API_URL}/admin/users/${userId}/subscription`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ plan: newPlan, status: 'active' })
+                }).then(() => {
+                    alert('User updated!');
+                    loadUsers();
+                });
+            }
+        }
+
+        function savePricing() {
+            alert('Pricing saved! (Demo - implement API endpoint)');
+        }
+    </script>
+</body>
+</html>
