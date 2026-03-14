@@ -16,7 +16,7 @@ app.use(morgan('dev'));
 
 // CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: '*',
   credentials: true
 }));
 
@@ -51,19 +51,21 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Serve frontend static files (in production)
-if (process.env.NODE_ENV === 'production') {
-  // Serve Next.js static files
-  app.use(express.static(path.join(__dirname, '../frontend/out')));
-  
-  // Serve admin panel
-  app.use('/admin', express.static(path.join(__dirname, '../frontend/public/admin')));
-  
-  // All other routes -> frontend
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/out/index.html'));
-  });
-}
+// Serve static files from frontend/out (Next.js export)
+app.use(express.static(path.join(__dirname, '../frontend/out')));
+
+// Serve admin panel
+app.use('/admin', express.static(path.join(__dirname, '../frontend/public/admin')));
+
+// API 404 handler
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API route not found' });
+});
+
+// All other routes -> serve frontend index.html (for client-side routing)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/out/index.html'));
+});
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -71,11 +73,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ 
     error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message 
   });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
 });
 
 const PORT = process.env.PORT || 10000;
