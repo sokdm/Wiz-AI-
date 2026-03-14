@@ -2,21 +2,24 @@ const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
 const checkSubscription = require('../middleware/checkSubscription');
-const QuizQuestion = require('../models/QuizQuestion');
 const QuizProgress = require('../models/QuizProgress');
 const Leaderboard = require('../models/Leaderboard');
-const aiService = require('../services/aiService');
+const quizAiService = require('../services/quizAiService');
 const User = require('../models/User');
 
 const PRIZE_LADDER = [0, 100, 200, 300, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 125000, 250000, 500000, 1000000];
 
+// Store current game questions in memory (or use Redis in production)
+const gameQuestions = new Map();
+
 // Start new game
 router.get('/start', auth, checkSubscription, async (req, res) => {
   try {
+    console.log('Quiz start requested by:', req.user._id);
+
     // Check daily limit for free users
     if (!req.isPremium) {
-      const today = new Date().toDateString();
-      let progress = await QuizProgress.findOne({ userId: req.user._id });
+      const progress = await QuizProgress.findOne({ userId: req.user._id });
       
       if (progress && progress.gamesPlayedToday >= req.userLimits.quizGames) {
         return res.status(403).json({
@@ -26,37 +29,40 @@ router.get('/start', auth, checkSubscription, async (req, res) => {
       }
     }
 
+    // Generate first question using AI
+    const question = await quizAiService.generateQuestion(1);
+    const questionId = `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Store question temporarily
+    gameQuestions.set(`${req.user._id}_${questionId}`, {
+      ...question,
+      id: questionId
+    });
+
     // Reset or create progress
-    let progress = await QuizProgress.findOneAndUpdate(
+    await QuizProgress.findOneAndUpdate(
       { userId: req.user._id },
       {
-        currentLevel: 1,
-        currentScore: 0,
-        lifelines: {
-          fiftyFifty: req.isPremium ? 3 : 1,
-          skip: req.isPremium ? 3 : 1,
-          askAudience: req.isPremium ? 3 : 1
+        $set: {
+          currentLevel: 1,
+          currentScore: 0,
+          lifelines: {
+            fiftyFifty: req.isPremium ? 3 : 1,
+            skip: req.isPremium ? 3 : 1,
+            askAudience: req.isPremium ? 3 : 1
+          },
+          gameState: 'playing',
+          questionsAnswered: [],
+          lastPlayedDate: new Date(),
+          currentQuestionId: questionId
         },
-        gameState: 'playing',
-        questionsAnswered: [],
-        lastPlayedDate: new Date(),
         $inc: { gamesPlayedToday: 1 }
       },
       { upsert: true, new: true }
     );
 
-    // Get first question - level 1
-    const question = await QuizQuestion.findOne({
-      difficultyLevel: 1,
-      isActive: true
-    }).lean();
+    console.log('Game started with AI-generated question');
 
-    if (!question) {
-      console.error('No level 1 question found in database');
-      return res.status(500).json({ error: 'No questions available. Please seed the database.' });
-    }
-
-    // Return full question data
     res.json({
       gameState: 'playing',
       currentLevel: 1,
@@ -67,7 +73,7 @@ router.get('/start', auth, checkSubscription, async (req, res) => {
         askAudience: req.isPremium ? 3 : 1
       },
       question: {
-        id: question._id.toString(),
+        id: questionId,
         question: question.question,
         options: question.options,
         category: question.category
@@ -92,22 +98,21 @@ router.get('/question/:level', auth, async (req, res) => {
       return res.status(400).json({ error: 'No active game. Please start a new game.' });
     }
 
-    const question = await QuizQuestion.findOne({
-      difficultyLevel: level,
-      isActive: true,
-      _id: { $nin: progress.questionsAnswered.map(q => q.questionId) }
-    }).lean();
-
-    if (!question) {
-      return res.status(404).json({ error: 'No question available for this level' });
-    }
+    // Generate new question using AI
+    const question = await quizAiService.generateQuestion(level);
+    const questionId = `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    gameQuestions.set(`${req.user._id}_${questionId}`, {
+      ...question,
+      id: questionId
+    });
 
     await QuizProgress.findByIdAndUpdate(progress._id, {
-      currentQuestionId: question._id
+      currentQuestionId: questionId
     });
 
     res.json({
-      id: question._id.toString(),
+      id: questionId,
       question: question.question,
       options: question.options,
       category: question.category,
@@ -129,19 +134,24 @@ router.post('/answer', auth, async (req, res) => {
       return res.status(400).json({ error: 'No active game' });
     }
 
-    const question = await QuizQuestion.findById(questionId);
+    // Get question from memory
+    const questionKey = `${req.user._id}_${questionId}`;
+    const question = gameQuestions.get(questionKey);
+    
     if (!question) {
-      return res.status(404).json({ error: 'Question not found' });
+      return res.status(404).json({ error: 'Question expired. Please start a new game.' });
     }
 
     const isCorrect = question.correctAnswer === answer;
+    
+    // Clean up used question
+    gameQuestions.delete(questionKey);
     
     if (isCorrect) {
       const newLevel = progress.currentLevel + 1;
       const newScore = PRIZE_LADDER[newLevel - 1] || progress.currentScore;
       
       if (newLevel > 15) {
-        // Game completed
         await handleGameComplete(req.user._id, progress, newScore, true);
         return res.json({
           correct: true,
@@ -164,7 +174,6 @@ router.post('/answer', auth, async (req, res) => {
         safeLevels: [5, 10].includes(newLevel - 1)
       });
     } else {
-      // Wrong answer - game over
       const finalScore = getSafeScore(progress.currentLevel);
       await handleGameComplete(req.user._id, progress, finalScore, false);
       
@@ -196,7 +205,13 @@ router.post('/lifeline/:type', auth, async (req, res) => {
       return res.status(400).json({ error: 'Lifeline not available' });
     }
 
-    const question = await QuizQuestion.findById(progress.currentQuestionId);
+    const questionKey = `${req.user._id}_${progress.currentQuestionId}`;
+    const question = gameQuestions.get(questionKey);
+    
+    if (!question) {
+      return res.status(404).json({ error: 'Question expired' });
+    }
+
     let result = {};
 
     switch(type) {
@@ -215,8 +230,12 @@ router.post('/lifeline/:type', auth, async (req, res) => {
         break;
       
       case 'askAudience':
-        const hint = await aiService.askAudience(question.question, question.options);
-        result = { audiencePoll: hint.response };
+        const poll = await quizAiService.generateAudiencePoll(
+          question.question,
+          question.options,
+          question.correctAnswer
+        );
+        result = { audiencePoll: poll };
         break;
     }
 
@@ -244,8 +263,7 @@ router.get('/leaderboard', async (req, res) => {
 
     const leaderboard = await Leaderboard.find(query)
       .sort({ score: -1, completedAt: 1 })
-      .limit(parseInt(limit))
-      .populate('userId', 'username');
+      .limit(parseInt(limit));
 
     res.json(leaderboard);
   } catch (error) {
@@ -268,7 +286,7 @@ async function handleGameComplete(userId, progress, finalScore, isPerfect) {
 
   await Leaderboard.create({
     userId,
-    username: progress.userId.username || 'Anonymous',
+    username: 'Anonymous',
     score: finalScore,
     levelReached: progress.currentLevel,
     isPerfectGame: isPerfect
