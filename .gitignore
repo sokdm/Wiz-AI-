@@ -11,14 +11,6 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Next.js
-.next/
-out/
-
-# Build files
-dist/
-build/
-
 # Logs
 logs/
 *.log
@@ -43,3 +35,7 @@ coverage/
 
 # Termux specific
 .termux/
+
+# Don't ignore build output for deployment
+# out/
+# .next/
